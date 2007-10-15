@@ -7,7 +7,7 @@ use Net::FTP ();
 use URI ();
 use File::Temp qw(tempfile);
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 =head1 NAME
 
@@ -22,17 +22,17 @@ Access is provided using L<Net::FTP> module.
 
 =cut
 
-
 sub drv_new {
     my ($self) = @_;
     my $uri = URI->new($self->{root});
-    my $ftp = Net::FTP->new($uri->host());
+    my $ftp = Net::FTP->new($uri->host()) or return;
     my ($user, $pass) = ($uri->userinfo || '') =~ m/^([^:]):?(.*)?/;
     if (!$user) {
         $user = 'ftp';
         $pass = 'vfssimple@';
     }
     $ftp->login($user, $pass) or return;
+    $ftp->pasv();
     
     $self->{uri} = $uri;
     $self->{ftp} = $ftp;
@@ -53,6 +53,16 @@ sub drv_copy {
     };
     close($fh);
     return $dest;
+}
+
+sub drv_exists {
+    my ($self, $file) = @_;
+    my ($dir, $filename) = ($self->{uri}->path() . '/' . $file) =~ m:(.*)/+([^/]*):;
+    $self->{ftp}->cwd($dir) or do {
+        $self->set_error($self->{ftp}->message);
+        return;
+    };
+    return(defined($self->{ftp}->mdtm($filename)));
 }
 
 1;
